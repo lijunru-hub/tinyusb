@@ -56,6 +56,30 @@ void OTG_HS_IRQHandler(void)
 
 UART_HandleTypeDef UartHandle;
 
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+
+#ifdef TRACE_ETM
+void trace_etm_init(void) {
+  // H7 trace pin is PE2 to PE6
+  // __HAL_RCC_GPIOE_CLK_ENABLE();
+
+  GPIO_InitTypeDef  gpio_init;
+  gpio_init.Pin       = GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6;
+  gpio_init.Mode      = GPIO_MODE_AF_PP;
+  gpio_init.Pull      = GPIO_PULLUP;
+  gpio_init.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+  gpio_init.Alternate = GPIO_AF0_TRACE;
+  HAL_GPIO_Init(GPIOE, &gpio_init);
+
+  // Enable trace clk, also in D1 and D3 domain
+  DBGMCU->CR |= DBGMCU_CR_DBG_TRACECKEN | DBGMCU_CR_DBG_CKD1EN | DBGMCU_CR_DBG_CKD3EN;
+}
+#else
+  #define trace_etm_init()
+#endif
+
 void board_init(void)
 {
   board_stm32h7_clock_init();
@@ -66,11 +90,15 @@ void board_init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE(); // USB ULPI NXT
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOE_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE(); // USB ULPI NXT
+#ifdef __HAL_RCC_GPIOI_CLK_ENABLE
   __HAL_RCC_GPIOI_CLK_ENABLE(); // USB ULPI NXT
+#endif
   __HAL_RCC_GPIOJ_CLK_ENABLE();
+
+  trace_etm_init();
 
   // Enable UART Clock
   UART_CLK_EN();
@@ -84,10 +112,12 @@ void board_init(void)
   SysTick->CTRL &= ~1U;
 
   // If freeRTOS is used, IRQ priority is limit by max syscall ( smaller is higher )
+#ifdef USB_OTG_FS_PERIPH_BASE
   NVIC_SetPriority(OTG_FS_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
+#endif
   NVIC_SetPriority(OTG_HS_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY );
 #endif
-  
+
   GPIO_InitTypeDef  GPIO_InitStruct;
 
   // LED
@@ -221,7 +251,8 @@ void board_init(void)
 
 void board_led_write(bool state)
 {
-  HAL_GPIO_WritePin(LED_PORT, LED_PIN, state ? LED_STATE_ON : (1-LED_STATE_ON));
+  GPIO_PinState pin_state = (GPIO_PinState) (state ? LED_STATE_ON : (1-LED_STATE_ON));
+  HAL_GPIO_WritePin(LED_PORT, LED_PIN, pin_state);
 }
 
 uint32_t board_button_read(void)
@@ -246,6 +277,7 @@ int board_uart_write(void const * buf, int len)
 volatile uint32_t system_ticks = 0;
 void SysTick_Handler(void)
 {
+  HAL_IncTick();
   system_ticks++;
 }
 
@@ -257,7 +289,7 @@ uint32_t board_millis(void)
 
 void HardFault_Handler(void)
 {
-  asm("bkpt");
+  __asm("BKPT #0\n");
 }
 
 // Required by __libc_init_array in startup code if we are compiling using
