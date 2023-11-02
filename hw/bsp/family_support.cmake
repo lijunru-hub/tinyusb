@@ -1,4 +1,4 @@
-include_guard()
+include_guard(GLOBAL)
 
 include(CMakePrintHelpers)
 
@@ -36,12 +36,15 @@ if (NOT EXISTS ${CMAKE_CURRENT_LIST_DIR}/${FAMILY}/family.cmake)
   message(FATAL_ERROR "Family '${FAMILY}' is not known/supported")
 endif()
 
-# enable LTO if supported
-include(CheckIPOSupported)
-check_ipo_supported(RESULT IPO_SUPPORTED)
-if (IPO_SUPPORTED)
-  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif ()
+if (NOT FAMILY STREQUAL rp2040)
+  # enable LTO if supported skip rp2040
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT IPO_SUPPORTED)
+  cmake_print_variables(IPO_SUPPORTED)
+  if (IPO_SUPPORTED)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+  endif()
+endif()
 
 set(WARNING_FLAGS_GNU
   -Wall
@@ -181,6 +184,12 @@ endfunction()
 function(family_configure_common TARGET RTOS)
   family_add_rtos(${TARGET} ${RTOS})
 
+  string(TOUPPER ${BOARD} BOARD_UPPER)
+  string(REPLACE "-" "_" BOARD_UPPER ${BOARD_UPPER})
+  target_compile_definitions(${TARGET} PUBLIC
+    BOARD_${BOARD_UPPER}
+  )
+
   # run size after build
   add_custom_command(TARGET ${TARGET} POST_BUILD
     COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${TARGET}>
@@ -208,6 +217,7 @@ function(family_configure_common TARGET RTOS)
       if (NOT TARGET segger_rtt)
         add_library(segger_rtt STATIC ${TOP}/lib/SEGGER_RTT/RTT/SEGGER_RTT.c)
         target_include_directories(segger_rtt PUBLIC ${TOP}/lib/SEGGER_RTT/RTT)
+        #target_compile_definitions(segger_rtt PUBLIC SEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL)
       endif()
       target_link_libraries(${TARGET} PUBLIC segger_rtt)
     endif ()
@@ -227,6 +237,10 @@ function(family_add_tinyusb TARGET OPT_MCU RTOS)
 
   if (DEFINED LOG)
     target_compile_definitions(${TARGET}-tinyusb_config INTERFACE CFG_TUSB_DEBUG=${LOG})
+    if (LOG STREQUAL "4")
+      # no inline for debug level 4
+      target_compile_definitions(${TARGET}-tinyusb_config INTERFACE TU_ATTR_ALWAYS_INLINE=)
+    endif ()
   endif()
 
   if (RTOS STREQUAL "freertos")
@@ -240,6 +254,15 @@ function(family_add_tinyusb TARGET OPT_MCU RTOS)
     # link tinyusb with freeRTOS kernel
     target_link_libraries(${TARGET}-tinyusb PUBLIC freertos_kernel)
   endif ()
+
+  # use max3421 as host controller
+  if (MAX3421_HOST STREQUAL "1")
+    target_compile_definitions(${TARGET}-tinyusb_config INTERFACE CFG_TUH_MAX3421=1)
+    target_sources(${TARGET}-tinyusb PUBLIC
+      ${TOP}/src/portable/analog/max3421/hcd_max3421.c
+      )
+  endif ()
+
 endfunction()
 
 
@@ -278,6 +301,10 @@ function(family_configure_dual_usb_example TARGET RTOS)
   family_configure_example(${TARGET} ${RTOS})
 endfunction()
 
+function(family_example_missing_dependency TARGET DEPENDENCY)
+  message(WARNING "${DEPENDENCY} submodule needed by ${TARGET} not found, please run 'python tools/get_deps.py ${DEPENDENCY}' to fetch it")
+endfunction()
+
 #----------------------------------
 # RPI specific: refactor later
 #----------------------------------
@@ -289,7 +316,8 @@ function(family_add_default_example_warnings TARGET)
     -Wfatal-errors
     -Wdouble-promotion
     -Wfloat-equal
-    -Wshadow
+    # FIXME commented out because of https://github.com/raspberrypi/pico-sdk/issues/1468
+    #-Wshadow
     -Wwrite-strings
     -Wsign-compare
     -Wmissing-format-attribute
@@ -397,6 +425,18 @@ function(family_flash_nxplink TARGET)
 endfunction()
 
 
+function(family_flash_dfu_util TARGET OPTION)
+  if (NOT DEFINED DFU_UTIL)
+    set(DFU_UTIL dfu-util)
+  endif ()
+
+  add_custom_target(${TARGET}-dfu-util
+    DEPENDS ${TARGET}
+    COMMAND ${DFU_UTIL} -R -d ${DFU_UTIL_VID_PID} -a 0 -D $<TARGET_FILE_DIR:${TARGET}>/${TARGET}.bin
+    VERBATIM
+    )
+endfunction()
+
 #----------------------------------
 # Family specific
 #----------------------------------
@@ -407,6 +447,11 @@ include(${CMAKE_CURRENT_LIST_DIR}/${FAMILY}/family.cmake)
 if (NOT FAMILY_MCUS)
   set(FAMILY_MCUS ${FAMILY})
 endif()
+
+# if use max3421 as host controller, expand FAMILY_MCUS to include max3421
+if (MAX3421_HOST STREQUAL "1")
+  set(FAMILY_MCUS ${FAMILY_MCUS} MAX3421)
+endif ()
 
 # save it in case of re-inclusion
 set(FAMILY_MCUS ${FAMILY_MCUS} CACHE INTERNAL "")

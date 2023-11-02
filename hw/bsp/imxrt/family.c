@@ -24,7 +24,7 @@
  * This file is part of the TinyUSB stack.
  */
 
-#include "bsp/board.h"
+#include "bsp/board_api.h"
 #include "board.h"
 
 // Suppress warning caused by mcu driver
@@ -188,7 +188,7 @@ void USB_OTG1_IRQHandler(void)
   #endif
 
   #if PORT_SUPPORT_HOST(0)
-    tuh_int_handler(0);
+    tuh_int_handler(0, true);
   #endif
 }
 
@@ -199,7 +199,7 @@ void USB_OTG2_IRQHandler(void)
   #endif
 
   #if PORT_SUPPORT_HOST(1)
-    tuh_int_handler(1);
+    tuh_int_handler(1, true);
   #endif
 }
 

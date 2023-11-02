@@ -51,8 +51,11 @@
 #define OPT_MCU_LPC40XX             7 ///< NXP LPC40xx
 #define OPT_MCU_LPC43XX             8 ///< NXP LPC43xx
 #define OPT_MCU_LPC51UXX            9 ///< NXP LPC51U6x
-#define OPT_MCU_LPC54XXX           10 ///< NXP LPC54xxx
-#define OPT_MCU_LPC55XX            11 ///< NXP LPC55xx
+#define OPT_MCU_LPC54              10 ///< NXP LPC54
+#define OPT_MCU_LPC55              11 ///< NXP LPC55
+// legacy naming
+#define OPT_MCU_LPC54XXX           OPT_MCU_LPC54
+#define OPT_MCU_LPC55XX            OPT_MCU_LPC55
 
 // NRF
 #define OPT_MCU_NRF5X             100 ///< Nordic nRF5x series
@@ -171,10 +174,10 @@
 // NXP LPC MCX
 #define OPT_MCU_MCXN9            2300  ///< NXP MCX N9 Series
 
-// Helper to check if configured MCU is one of listed
+// Check if configured MCU is one of listed
 // Apply _TU_CHECK_MCU with || as separator to list of input
-#define _TU_CHECK_MCU(_m)   (CFG_TUSB_MCU == _m)
-#define TU_CHECK_MCU(...)   (TU_ARGS_APPLY(_TU_CHECK_MCU, ||, __VA_ARGS__))
+#define _TU_CHECK_MCU(_m)    (CFG_TUSB_MCU == _m)
+#define TU_CHECK_MCU(...)    (TU_ARGS_APPLY(_TU_CHECK_MCU, ||, __VA_ARGS__))
 
 //--------------------------------------------------------------------+
 // Supported OS
@@ -295,15 +298,14 @@
   #define CFG_TUSB_DEBUG 0
 #endif
 
-// TODO MEM_SECTION can be different for host and device controller
-// should use CFG_TUD_MEM_SECTION, CFG_TUH_MEM_SECTION
+// Memory section for placing buffer used for usb transferring. If MEM_SECTION is different for
+// host and device use: CFG_TUD_MEM_SECTION, CFG_TUH_MEM_SECTION instead
 #ifndef CFG_TUSB_MEM_SECTION
   #define CFG_TUSB_MEM_SECTION
 #endif
 
-// alignment requirement of buffer used for endpoint transferring
-// TODO MEM_ALIGN can be different for host and device controller
-// should use CFG_TUD_MEM_ALIGN, CFG_TUH_MEM_ALIGN
+// Alignment requirement of buffer used for usb transferring. if MEM_ALIGN is different for
+// host and device controller use: CFG_TUD_MEM_ALIGN, CFG_TUH_MEM_ALIGN instead
 #ifndef CFG_TUSB_MEM_ALIGN
   #define CFG_TUSB_MEM_ALIGN      TU_ATTR_ALIGNED(4)
 #endif
@@ -321,24 +323,14 @@
 // Device Options (Default)
 //--------------------------------------------------------------------
 
-// Attribute to place data in accessible RAM for device controller
-// default to CFG_TUSB_MEM_SECTION for backward-compatible
+// Attribute to place data in accessible RAM for device controller (default: CFG_TUSB_MEM_SECTION)
 #ifndef CFG_TUD_MEM_SECTION
-  #ifdef CFG_TUSB_MEM_SECTION
-    #define CFG_TUD_MEM_SECTION   CFG_TUSB_MEM_SECTION
-  #else
-    #define CFG_TUD_MEM_SECTION
-  #endif
+  #define CFG_TUD_MEM_SECTION     CFG_TUSB_MEM_SECTION
 #endif
 
-// Attribute to align memory for device controller
-// default to CFG_TUSB_MEM_ALIGN for backward-compatible
+// Attribute to align memory for device controller (default: CFG_TUSB_MEM_ALIGN)
 #ifndef CFG_TUD_MEM_ALIGN
-  #ifdef CFG_TUSB_MEM_ALIGN
-    #define CFG_TUD_MEM_ALIGN   CFG_TUSB_MEM_ALIGN
-  #else
-    #define CFG_TUD_MEM_ALIGN   TU_ATTR_ALIGNED(4)
-  #endif
+  #define CFG_TUD_MEM_ALIGN       CFG_TUSB_MEM_ALIGN
 #endif
 
 #ifndef CFG_TUD_ENDPOINT0_SIZE
@@ -419,33 +411,24 @@
   #endif
 #endif // CFG_TUH_ENABLED
 
-// Attribute to place data in accessible RAM for host controller
-// default to CFG_TUSB_MEM_SECTION for backward-compatible
+// Attribute to place data in accessible RAM for host controller (default: CFG_TUSB_MEM_SECTION)
 #ifndef CFG_TUH_MEM_SECTION
-  #ifdef CFG_TUSB_MEM_SECTION
-    #define CFG_TUH_MEM_SECTION   CFG_TUSB_MEM_SECTION
-  #else
-    #define CFG_TUH_MEM_SECTION
-  #endif
+  #define CFG_TUH_MEM_SECTION   CFG_TUSB_MEM_SECTION
 #endif
 
 // Attribute to align memory for host controller
 #ifndef CFG_TUH_MEM_ALIGN
-  #ifdef CFG_TUSB_MEM_ALIGN
-    #define CFG_TUH_MEM_ALIGN   CFG_TUSB_MEM_ALIGN
-  #else
-    #define CFG_TUH_MEM_ALIGN   TU_ATTR_ALIGNED(4)
-  #endif
+  #define CFG_TUH_MEM_ALIGN     CFG_TUSB_MEM_ALIGN
 #endif
 
 //------------- CLASS -------------//
 
 #ifndef CFG_TUH_HUB
-#define CFG_TUH_HUB    0
+  #define CFG_TUH_HUB    0
 #endif
 
 #ifndef CFG_TUH_CDC
-#define CFG_TUH_CDC    0
+  #define CFG_TUH_CDC    0
 #endif
 
 #ifndef CFG_TUH_CDC_FTDI
@@ -459,34 +442,38 @@
 #endif
 
 #ifndef CFG_TUH_HID
-#define CFG_TUH_HID    0
+  #define CFG_TUH_HID    0
 #endif
 
 #ifndef CFG_TUH_MIDI
-#define CFG_TUH_MIDI   0
+  #define CFG_TUH_MIDI   0
 #endif
 
 #ifndef CFG_TUH_MSC
-#define CFG_TUH_MSC    0
+  #define CFG_TUH_MSC    0
 #endif
 
 #ifndef CFG_TUH_VENDOR
-#define CFG_TUH_VENDOR 0
+  #define CFG_TUH_VENDOR 0
 #endif
 
 #ifndef CFG_TUH_API_EDPT_XFER
-#define CFG_TUH_API_EDPT_XFER 0
+  #define CFG_TUH_API_EDPT_XFER 0
 #endif
 
 // Enable PIO-USB software host controller
 #ifndef CFG_TUH_RPI_PIO_USB
-#define CFG_TUH_RPI_PIO_USB 0
+  #define CFG_TUH_RPI_PIO_USB 0
 #endif
 
 #ifndef CFG_TUD_RPI_PIO_USB
-#define CFG_TUD_RPI_PIO_USB 0
+  #define CFG_TUD_RPI_PIO_USB 0
 #endif
 
+// MAX3421 Host controller option
+#ifndef CFG_TUH_MAX3421
+  #define CFG_TUH_MAX3421  0
+#endif
 
 //--------------------------------------------------------------------+
 // TypeC Options (Default)
