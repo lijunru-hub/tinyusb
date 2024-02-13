@@ -630,6 +630,27 @@ void dcd_sof_enable(uint8_t rhport, bool en)
 /* DCD Endpoint port
  *------------------------------------------------------------------*/
 
+// Check is IN/OUT endpoint is avaliable before opening it
+static bool dcd_edpt_check_if_avaliable(uint8_t rhport, uint8_t direction)
+{
+  if (direction) {  // IN direction
+    if (ep_avaliable_count[rhport].in_ep < 1) {
+      TU_LOG(1, "Trying to open IN endpoint, but max number of IN endpoints already opened on this target \r\n");
+      return false;
+    }
+  } else {        // OUT direction
+    if (ep_avaliable_count[rhport].out_ep < 1) {
+      TU_LOG(1, "Trying to open OUT endpoint, but max number of OUT endpoints already opened on this target \r\n");
+      return false;
+    }
+  }
+
+  ep_avaliable_count[rhport].in_ep--;
+  ep_avaliable_count[rhport].out_ep--;
+
+  return true;
+}
+
 bool dcd_edpt_open (uint8_t rhport, tusb_desc_endpoint_t const * desc_edpt)
 {
   (void) rhport;
@@ -640,7 +661,7 @@ bool dcd_edpt_open (uint8_t rhport, tusb_desc_endpoint_t const * desc_edpt)
   uint8_t const epnum = tu_edpt_number(desc_edpt->bEndpointAddress);
   uint8_t const dir   = tu_edpt_dir(desc_edpt->bEndpointAddress);
 
-  TU_ASSERT(epnum < ep_count);
+  TU_ASSERT(dcd_edpt_check_if_avaliable(rhport, dir));
 
   xfer_ctl_t * xfer = XFER_CTL_BASE(epnum, dir);
   xfer->max_size = tu_edpt_packet_size(desc_edpt);

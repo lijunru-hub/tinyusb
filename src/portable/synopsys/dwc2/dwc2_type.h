@@ -32,6 +32,12 @@ typedef struct
   uint32_t  ep_fifo_size;
 }dwc2_controller_t;
 
+typedef struct
+{
+  int8_t out_ep;
+  int8_t in_ep;
+}ep_avaliable_count_t;
+
 /* DWC OTG HW Release versions */
 #define DWC2_CORE_REV_2_71a   0x4f54271a
 #define DWC2_CORE_REV_2_72a   0x4f54272a
