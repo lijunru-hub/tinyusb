@@ -72,7 +72,7 @@ set(WARNING_FLAGS_GNU
   -Wredundant-decls
   )
 
-set(WARNINGS_FLAGS_IAR "")
+set(WARNING_FLAGS_IAR "")
 
 
 # Filter example based on only.txt and skip.txt
@@ -191,10 +191,12 @@ function(family_configure_common TARGET RTOS)
   )
 
   # run size after build
-  add_custom_command(TARGET ${TARGET} POST_BUILD
-    COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${TARGET}>
-    )
-
+  find_program(SIZE_EXE ${CMAKE_SIZE})
+  if(NOT ${SIZE_EXE} STREQUAL SIZE_EXE-NOTFOUND)
+    add_custom_command(TARGET ${TARGET} POST_BUILD
+      COMMAND ${SIZE_EXE} $<TARGET_FILE:${TARGET}>
+      )
+  endif ()
   # Add warnings flags
   target_compile_options(${TARGET} PUBLIC ${WARNING_FLAGS_${CMAKE_C_COMPILER_ID}})
 
@@ -204,6 +206,9 @@ function(family_configure_common TARGET RTOS)
     if (CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 12.0)
       target_link_options(${TARGET} PUBLIC "LINKER:--no-warn-rwx-segments")
     endif ()
+  endif()
+  if (CMAKE_C_COMPILER_ID STREQUAL "IAR")
+    target_link_options(${TARGET} PUBLIC "LINKER:--map=$<TARGET_FILE:${TARGET}>.map")
   endif()
 
   # ETM Trace option
@@ -367,7 +372,7 @@ function(family_flash_jlink TARGET)
   endif ()
 
   file(GENERATE
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.jlink
+    OUTPUT $<TARGET_FILE_DIR:${TARGET}>/${TARGET}.jlink
     CONTENT "halt
 loadfile $<TARGET_FILE:${TARGET}>
 r
@@ -377,7 +382,7 @@ exit"
 
   add_custom_target(${TARGET}-jlink
     DEPENDS ${TARGET}
-    COMMAND ${JLINKEXE} -device ${JLINK_DEVICE} -if swd -JTAGConf -1,-1 -speed auto -CommandFile ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}.jlink
+    COMMAND ${JLINKEXE} -device ${JLINK_DEVICE} -if swd -JTAGConf -1,-1 -speed auto -CommandFile $<TARGET_FILE_DIR:${TARGET}>/${TARGET}.jlink
     )
 endfunction()
 
@@ -395,6 +400,22 @@ function(family_flash_stlink TARGET)
 endfunction()
 
 
+# Add flash openocd target
+function(family_flash_openocd TARGET CLI_OPTIONS)
+  if (NOT DEFINED OPENOCD)
+    set(OPENOCD openocd)
+  endif ()
+
+  separate_arguments(CLI_OPTIONS_LIST UNIX_COMMAND ${CLI_OPTIONS})
+
+  # note skip verify since it has issue with rp2040
+  add_custom_target(${TARGET}-openocd
+    DEPENDS ${TARGET}
+    COMMAND ${OPENOCD} ${CLI_OPTIONS_LIST} -c "program $<TARGET_FILE:${TARGET}> reset exit"
+    VERBATIM
+    )
+endfunction()
+
 # Add flash pycod target
 function(family_flash_pyocd TARGET)
   if (NOT DEFINED PYOC)
@@ -407,6 +428,18 @@ function(family_flash_pyocd TARGET)
     )
 endfunction()
 
+
+# Add flash teensy_cli target
+function(family_flash_teensy TARGET)
+  if (NOT DEFINED TEENSY_CLI)
+    set(TEENSY_CLI teensy_loader_cli)
+  endif ()
+
+  add_custom_target(${TARGET}-teensy
+    DEPENDS ${TARGET}
+    COMMAND ${TEENSY_CLI} --mcu=${TEENSY_MCU} -w -s $<TARGET_FILE_DIR:${TARGET}>/${TARGET}.hex
+    )
+endfunction()
 
 # Add flash using NXP's LinkServer (redserver)
 # https://www.nxp.com/design/software/development-software/mcuxpresso-software-and-tools-/linkserver-for-microcontrollers:LINKERSERVER

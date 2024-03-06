@@ -76,6 +76,7 @@ enum {
   #define LFCLK_SRC_RC CLOCK_LFCLKSRC_SRC_LFRC
   #define VBUSDETECT_Msk USBREG_USBREGSTATUS_VBUSDETECT_Msk
   #define OUTPUTRDY_Msk USBREG_USBREGSTATUS_OUTPUTRDY_Msk
+  #define GPIOTE_IRQn GPIOTE1_IRQn
 #else
   #define LFCLK_SRC_RC CLOCK_LFCLKSRC_SRC_RC
   #define VBUSDETECT_Msk POWER_USBREGSTATUS_VBUSDETECT_Msk
@@ -201,6 +202,22 @@ void board_led_write(bool state) {
 
 uint32_t board_button_read(void) {
   return BUTTON_STATE_ACTIVE == nrf_gpio_pin_read(BUTTON_PIN);
+}
+
+size_t board_get_unique_id(uint8_t id[], size_t max_len) {
+  (void) max_len;
+
+#ifdef NRF5340_XXAA
+  uintptr_t did_addr = (uintptr_t) NRF_FICR->INFO.DEVICEID;
+#else
+  uintptr_t did_addr = (uintptr_t) NRF_FICR->DEVICEID;
+#endif
+
+  const uint8_t* device_id = (const uint8_t*) did_addr;
+  for(uint8_t i=0; i<8; i++) {
+    id[i] = device_id[i];
+  }
+  return 8;
 }
 
 int board_uart_read(uint8_t* buf, int len) {

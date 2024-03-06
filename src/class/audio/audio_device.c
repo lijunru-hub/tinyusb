@@ -1565,7 +1565,8 @@ uint16_t audiod_open(uint8_t rhport, tusb_desc_interface_t const * itf_desc, uin
       {
         uint8_t const *p_desc = _audiod_fct[i].p_desc;
         uint8_t const *p_desc_end = p_desc + _audiod_fct[i].desc_length - TUD_AUDIO_DESC_IAD_LEN;
-        while (p_desc < p_desc_end)
+        // Condition modified from p_desc < p_desc_end to prevent gcc>=12 strict-overflow warning
+        while (p_desc_end - p_desc > 0)
         {
           if (tu_desc_type(p_desc) == TUSB_DESC_ENDPOINT)
           {
@@ -1728,7 +1729,7 @@ static bool audiod_set_interface(uint8_t rhport, tusb_control_request_t const * 
     // Find correct interface
     if (tu_desc_type(p_desc) == TUSB_DESC_INTERFACE && ((tusb_desc_interface_t const * )p_desc)->bInterfaceNumber == itf && ((tusb_desc_interface_t const * )p_desc)->bAlternateSetting == alt)
     {
-#if CFG_TUD_AUDIO_ENABLE_ENCODING || CFG_TUD_AUDIO_ENABLE_DECODING || CFG_TUD_AUDIO_EP_IN_FLOW_CONTROL
+#if (CFG_TUD_AUDIO_ENABLE_EP_IN && (CFG_TUD_AUDIO_EP_IN_FLOW_CONTROL || CFG_TUD_AUDIO_ENABLE_ENCODING)) || (CFG_TUD_AUDIO_ENABLE_EP_OUT && CFG_TUD_AUDIO_ENABLE_DECODING)
       uint8_t const * p_desc_parse_for_params = p_desc;
 #endif
       // From this point forward follow the EP descriptors associated to the current alternate setting interface - Open EPs if necessary
