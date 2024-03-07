@@ -87,3 +87,7 @@ lib/FreeRTOS-Kernel
 lib/lwip
 lib/sct_neopixel
 tools/uf2
+build/
+sdkconfig
+test/idf/device/cdc_msc_freertos/sdkconfig.old
+test/idf/device/cdc_msc_freertos/dependencies.lock
