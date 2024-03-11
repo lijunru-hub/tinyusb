@@ -630,26 +630,37 @@ void dcd_sof_enable(uint8_t rhport, bool en)
 /* DCD Endpoint port
  *------------------------------------------------------------------*/
 
-// Check is IN/OUT endpoint is avaliable before opening it
-static bool dcd_edpt_check_if_avaliable(uint8_t rhport, uint8_t direction)
+#if TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3, OPT_MCU_ESP32P4)
+
+// Check if IN/OUT endpoint is avaliable before opening it
+static bool dcd_ep_available(uint8_t rhport, uint8_t dir) 
 {
-  if (direction) {  // IN direction
-    if (ep_avaliable_count[rhport].in_ep < 1) {
-      TU_LOG(1, "Trying to open IN endpoint, but max number of IN endpoints already opened on this target \r\n");
-      return false;
+    // Verify that we have a vacant EP
+    if ((dwc_ep_config[rhport].in_ep + dwc_ep_config[rhport].out_ep) > (dwc_ep_config[rhport].ep_max_count - 1)) {
+        TU_LOG(1, "Trying to open an endpoint, but max number of endpoints: %d already opened on this target \r\n", dwc_ep_config[rhport].ep_max_count);
+        return false;
     }
-  } else {        // OUT direction
-    if (ep_avaliable_count[rhport].out_ep < 1) {
-      TU_LOG(1, "Trying to open OUT endpoint, but max number of OUT endpoints already opened on this target \r\n");
-      return false;
+    // Get the ep_count amount at the moment as a temporal variable and update it
+    uint8_t new_ep_count = (dir) ? dwc_ep_config[rhport].in_ep : dwc_ep_config[rhport].out_ep;
+    new_ep_count++;
+
+    // Verify overflow for IN EP ESP32Sx
+ #if TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3)
+     // ESP32Sx has 6 endpoints, from which only 5 can be confiugred as IN
+     if ((dir) && (new_ep_count > (dwc_ep_config[rhport].ep_max_count - 1))) {
+         TU_LOG(1, "Trying to open IN endpoint, but max number of IN endpoints: %d already opened on this target \r\n", dwc_ep_config[rhport].ep_max_count - 1);
+         return false;
+     }
+ #endif // TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3)
+    // Write new value back
+    if(dir) {
+        dwc_ep_config[rhport].in_ep = new_ep_count;
+    } else {
+        dwc_ep_config[rhport].out_ep = new_ep_count;
     }
-  }
-
-  ep_avaliable_count[rhport].in_ep--;
-  ep_avaliable_count[rhport].out_ep--;
-
-  return true;
+    return true; 
 }
+#endif // TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3, OPT_MCU_ESP32P4)
 
 bool dcd_edpt_open (uint8_t rhport, tusb_desc_endpoint_t const * desc_edpt)
 {
@@ -661,7 +672,11 @@ bool dcd_edpt_open (uint8_t rhport, tusb_desc_endpoint_t const * desc_edpt)
   uint8_t const epnum = tu_edpt_number(desc_edpt->bEndpointAddress);
   uint8_t const dir   = tu_edpt_dir(desc_edpt->bEndpointAddress);
 
-  TU_ASSERT(dcd_edpt_check_if_avaliable(rhport, dir));
+  #if TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3, OPT_MCU_ESP32P4)
+  if (!dcd_ep_available(rhport, dir)) {
+    return false;
+  }
+  #endif
 
   xfer_ctl_t * xfer = XFER_CTL_BASE(epnum, dir);
   xfer->max_size = tu_edpt_packet_size(desc_edpt);
@@ -741,6 +756,11 @@ void dcd_edpt_close_all (uint8_t rhport)
 {
   dwc2_regs_t * dwc2     = DWC2_REG(rhport);
   uint8_t const ep_count = _dwc2_controller[rhport].ep_count;
+
+  #if TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3, OPT_MCU_ESP32P4)
+  dwc_ep_config[rhport].in_ep = 0;
+  dwc_ep_config[rhport].out_ep = 0;
+  #endif
 
   // Disable non-control interrupt
   dwc2->daintmsk = (1 << DAINTMSK_OEPM_Pos) | (1 << DAINTMSK_IEPM_Pos);
@@ -898,6 +918,14 @@ void dcd_edpt_close (uint8_t rhport, uint8_t ep_addr)
   uint8_t const dir   = tu_edpt_dir(ep_addr);
 
   dcd_edpt_disable(rhport, ep_addr, false);
+
+  #if TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3, OPT_MCU_ESP32P4)
+  if (dir) {
+    dwc_ep_config[rhport].in_ep--;
+  } else {
+    dwc_ep_config[rhport].out_ep--;
+  }
+  #endif
 
   // Update max_size
   xfer_status[epnum][dir].max_size = 0;  // max_size = 0 marks a disabled EP - required for changing FIFO allocation

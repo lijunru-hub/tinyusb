@@ -82,19 +82,13 @@ static const dwc2_controller_t _dwc2_controller[] =
 #endif
 };
 
-static ep_avaliable_count_t ep_avaliable_count[] =
+static dwc_ep_config_t dwc_ep_config[] = 
 {
 #ifdef DWC2_FS_PERIPH_BASE
-// ESP32Sx has 6 endpoints, from which only 5 can be confiugred as IN
-#if TU_CHECK_MCU(OPT_MCU_ESP32S2, OPT_MCU_ESP32S3)
-  { .out_ep = DWC2_FS_EP_MAX, .in_ep = DWC2_FS_EP_MAX - 1},
-#else
-  { .out_ep = DWC2_FS_EP_MAX, .in_ep = DWC2_FS_EP_MAX},
+  { .out_ep = 0, .in_ep = 0, .ep_max_count = DWC2_FS_EP_MAX },
 #endif
-#endif
-
 #ifdef DWC2_HS_PERIPH_BASE
-  { .out_ep = DWC2_HS_EP_MAX, .in_ep = DWC2_HS_EP_MAX},
+  { .out_ep = 0, .in_ep = 0, .ep_max_count = DWC2_HS_EP_MAX },
 #endif
 };
 
